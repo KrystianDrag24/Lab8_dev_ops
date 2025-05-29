@@ -1,0 +1,72 @@
+name: Lab8 Deployment Pipeline
+
+on:
+  push:
+    branches:
+      - Lab8/417477
+
+jobs:
+  unit_tests:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.10
+
+      - name: Install dependencies
+        working-directory: env_417477
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run unit tests
+        working-directory: env_417477
+        run: |
+          python3 -m unittest discover -s tests/unit
+
+  functional_tests:
+    name: Run Functional Tests
+    needs: unit_tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.10
+
+      - name: Install dependencies
+        working-directory: env_417477
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run functional tests
+        working-directory: env_417477
+        run: |
+          python3 -m unittest discover -s tests/functional
+
+  deployment:
+    name: Build & Deploy Docker Image
+    needs: functional_tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_HUB_417477 }}" | docker login -u "${{ secrets.DOCKER_USERNAME_417477 }}" --password-stdin
+
+      - name: Build Docker image
+        working-directory: env_417477
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME_417477 }}/lab8_417477 .
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME_417477 }}/lab8_417477
