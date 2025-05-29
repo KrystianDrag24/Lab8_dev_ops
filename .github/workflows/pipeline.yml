@@ -22,11 +22,13 @@ jobs:
         working-directory: env_417477
         run: |
           pip install -r requirements.txt
+          pip install pytest # Instalacja pytest
 
       - name: Run unit tests
         working-directory: env_417477
         run: |
-          PYTHONPATH=$(pwd):$PYTHONPATH python3 -m unittest discover -s main -p "*_test.py"
+          # Uruchomienie testów jednostkowych za pomocą pytest, celując w calculator_test.py
+          pytest main/calculator_test.py
 
   functional_tests:
     name: Run Functional Tests
@@ -45,11 +47,25 @@ jobs:
         working-directory: env_417477
         run: |
           pip install -r requirements.txt
+          pip install pytest # Instalacja pytest
+
+      - name: Run app for functional tests
+        working-directory: env_417477
+        run: |
+          # Uruchomienie aplikacji w tle dla testów funkcjonalnych
+          # Upewnij się, że app.py jest w env_417477/main/
+          nohup python main/app.py &
+
+      - name: Wait for app to start
+        run: |
+          # Daj aplikacji czas na uruchomienie
+          sleep 10
 
       - name: Run functional tests
         working-directory: env_417477
         run: |
-          PYTHONPATH=$(pwd):$PYTHONPATH python3 -m unittest discover -s main -p "*_test.py"
+          # Uruchomienie testów funkcjonalnych za pomocą pytest, celując w app_test.py
+          pytest main/app_test.py
 
   deployment:
     name: Build & Deploy Docker Image
@@ -59,14 +75,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
       - name: Log in to Docker Hub
-        run: echo "${{ secrets.DOCKER_HUB_417477 }}" | docker login -u "${{ secrets.DOCKER_USERNAME_417477 }}" --password-stdin
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME_417477 }}
+          password: ${{ secrets.DOCKER_HUB_417477 }} # Używamy DOCKER_HUB_417477 jako hasła/tokenu
 
-      - name: Build Docker image
-        working-directory: env_417477
-        run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME_417477 }}/lab8_417477 .
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v2
+        with:
+          context: ./env_417477 # Kontekst budowania Dockerfile
+          file: ./env_417477/Dockerfile # Ścieżka do Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME_417477 }}/lab8_417477:latest # Nazwa obrazu z Twoim numerem indeksu
 
-      - name: Push Docker image
+      - name: Verify deployment
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME_417477 }}/lab8_417477
+          # Weryfikacja, czy obraz został poprawnie wdrożony
+          docker pull ${{ secrets.DOCKER_USERNAME_417477 }}/lab8_417477:latest
+          # Zakładając, że app.py jest punktem wejścia i importuje się jako 'app' wewnątrz kontenera
+          docker run --rm ${{ secrets.DOCKER_USERNAME_417477 }}/lab8_417477:latest python -c "import app; print('Deployment successful')"
